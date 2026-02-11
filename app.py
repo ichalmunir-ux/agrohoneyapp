@@ -1,34 +1,34 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
-import plotly.express as px
 from datetime import datetime
 
-# --- UI CONFIG ---
+# --- CONFIG ---
 st.set_page_config(page_title="AgroHoney Pro Cloud", layout="wide")
 
-# --- KONEKSI GOOGLE SHEETS ---
-conn = st.connection("gsheets", type=GSheetsConnection)
+# --- KONEKSI DENGAN TRY-EXCEPT ---
+try:
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    # Gunakan TTL=0 agar data selalu fresh
+    df_in = conn.read(worksheet="stok_masuk", ttl=0)
+    st.sidebar.success("✅ Database Terhubung")
+except Exception as e:
+    st.error(f"❌ Koneksi GSheets Gagal: {e}")
+    st.info("Pastikan URL di Secrets sudah benar dan Google Sheets sudah di-share ke 'Anyone with the link'.")
+    st.stop()
 
-# --- FUNGSI PEMBERSIH DATA (ANTISIPASI ERROR TYPE) ---
-def clean_data(df):
-    for col in ['qty', 'modal', 'sisa', 'harga_jual']:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-    return df
+# --- LOGIN SEDERHANA ---
+st.sidebar.title("🔐 Login")
+user = st.sidebar.selectbox("Role", ["Pilih User", "Owner", "Admin"])
+passw = st.sidebar.text_input("Password", type="password")
 
-# --- FUNGSI HELPER ---
-def generate_code(pemasok, asal, harga):
-    p = pemasok[0].upper() if pemasok else "X"
-    a = asal[0].upper() if asal else "X"
-    h = str(int(harga/1000))
-    return f"{p}{a}{h}"
-
-# --- LOGIN SYSTEM ---
-st.sidebar.title("🔐 Akses AgroHoney")
-user_role = st.sidebar.selectbox("Pilih Role User", ["Pilih User", "Owner", "Admin Penginput"])
-password = st.sidebar.text_input("Password", type="password")
-
+if (user == "Owner" and passw == "owner123") or (user == "Admin" and passw == "admin123"):
+    st.title(f"🐝 Selamat Datang, {user}")
+    st.write("Aplikasi siap digunakan. Silakan pilih menu di sidebar.")
+    # Tambahkan menu navigasi Anda di sini...
+else:
+    st.title("🐝 AgroHoney Management")
+    st.warning("Silakan login untuk memulai.")
 # Kredensial sesuai profil Anda
 if (user_role == "Owner" and password == "owner123") or (user_role == "Admin Penginput" and password == "admin123"):
     st.sidebar.success(f"Login: {user_role}")
@@ -135,3 +135,4 @@ else:
         st.sidebar.error("Password Salah!")
     st.title("🐝 AgroHoney Management")
     st.info("Silakan Login di sidebar untuk akses sistem.")
+
