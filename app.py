@@ -78,9 +78,9 @@ if (role == "Owner" and key == "owner123") or (role == "Admin Penginput" and key
         st.dataframe(df_out, use_container_width=True)
         st.download_button("Simpan Laporan (CSV)", df_out.to_csv(index=False), "Laporan_AgroHoney.csv")
 
-    # --- MENU: INPUT STOK MASUK (VERSI STABIL HP) ---
+    # --- MENU: INPUT STOK MASUK (VERSI ANTI-ERROR) ---
     elif "Input Stok" in choice:
-        st.header("📥 Form Penerimaan Stok Madu Baru")
+        st.header("📥 Form Penerimaan Madu Baru")
         with st.form("input_stok", clear_on_submit=True):
             pmsok = st.text_input("Nama Pemasok")
             asl = st.text_input("Daerah Asal")
@@ -88,30 +88,38 @@ if (role == "Owner" and key == "owner123") or (role == "Admin Penginput" and key
             mdl = st.number_input("Harga Modal per Botol", min_value=0, step=1000)
             
             if st.form_submit_button("Kirim ke Cloud"):
-                if pmsok and asl:
+                if not pmsok or not asl:
+                    st.warning("Mohon isi Nama Pemasok dan Asal!")
+                else:
                     try:
-                        # 1. Logika Penamaan AJ80
+                        # 1. Generate Kode AJ80
                         kd = f"{pmsok[0].upper()}{asl[0].upper()}{int(mdl/1000)}"
                         tgl = datetime.now().strftime("%Y-%m-%d")
                         
-                        # 2. Buat data baru dengan urutan kolom yang PASTI sama dengan GSheets
-                        # Pastikan urutan ini: kode, tanggal, pemasok, asal, qty, modal, sisa
-                        data_baru = pd.DataFrame([[kd, tgl, pmsok, asl, jml, mdl, jml]], 
-                                                 columns=['kode', 'tanggal', 'pemasok', 'asal', 'qty', 'modal', 'sisa'])
+                        # 2. Paksa pembuatan DataFrame dengan kolom yang SAMA PERSIS dengan GSheets
+                        # Urutan harus: kode, tanggal, pemasok, asal, qty, modal, sisa
+                        new_data = pd.DataFrame({
+                            "kode": [kd],
+                            "tanggal": [tgl],
+                            "pemasok": [pmsok],
+                            "asal": [asl],
+                            "qty": [int(jml)],
+                            "modal": [int(mdl)],
+                            "sisa": [int(jml)]
+                        })
                         
-                        # 3. Gabungkan dengan data lama
-                        df_updated = pd.concat([df_in, data_baru], ignore_index=True)
+                        # 3. Refresh data lama dulu agar tidak tumpang tindih (Conflict)
+                        df_current = conn.read(worksheet="stok_masuk", ttl=0)
                         
-                        # 4. Update ke Cloud
-                        conn.update(worksheet="stok_masuk", data=df_updated)
+                        # 4. Gabungkan dan Update
+                        df_final = pd.concat([df_current, new_data], ignore_index=True)
+                        conn.update(worksheet="stok_masuk", data=df_final)
                         
-                        st.success(f"✅ Berhasil Disimpan! Kode: {kd}")
+                        st.success(f"✅ Data Tersimpan! Kode: {kd}")
                         st.balloons()
-                        # Beri jeda sedikit agar user bisa lihat suksesnya sebelum refresh
                     except Exception as e:
-                        st.error(f"Gagal menyimpan: {e}")
-                else:
-                    st.warning("Mohon isi Nama Pemasok dan Asal!")
+                        st.error(f"❌ Detail Error: {str(e)}")
+                        st.info("Saran: Cek apakah nama kolom di GSheets sudah benar (huruf kecil semua).")
 
     # --- FITUR: KASIR (ADMIN ONLY) ---
     elif "Kasir" in choice:
@@ -125,4 +133,5 @@ else:
     st.markdown("---")
     st.write("Sistem ini terhubung langsung ke Dokumen Pencatatan. Silakan login untuk melihat dashboard atau menginput data.")
     st.image("https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=800", caption="Digitalisasi Agrowisata California")
+
 
