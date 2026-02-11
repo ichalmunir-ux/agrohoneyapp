@@ -78,24 +78,40 @@ if (role == "Owner" and key == "owner123") or (role == "Admin Penginput" and key
         st.dataframe(df_out, use_container_width=True)
         st.download_button("Simpan Laporan (CSV)", df_out.to_csv(index=False), "Laporan_AgroHoney.csv")
 
-    # --- FITUR: INPUT STOK (ADMIN ONLY) ---
+    # --- MENU: INPUT STOK MASUK (VERSI STABIL HP) ---
     elif "Input Stok" in choice:
-        st.header("📥 Form Penerimaan Madu Baru")
+        st.header("📥 Form Penerimaan Stok Madu Baru")
         with st.form("input_stok", clear_on_submit=True):
             pmsok = st.text_input("Nama Pemasok")
             asl = st.text_input("Daerah Asal")
-            jml = st.number_input("Jumlah (Botol)", min_value=1)
-            mdl = st.number_input("Modal per Botol", min_value=0)
+            jml = st.number_input("Jumlah (Botol)", min_value=1, step=1)
+            mdl = st.number_input("Harga Modal per Botol", min_value=0, step=1000)
             
             if st.form_submit_button("Kirim ke Cloud"):
-                # Logika Penamaan AJ80
-                kd = f"{pmsok[0].upper() if pmsok else 'X'}{asl[0].upper() if asl else 'X'}{int(mdl/1000)}"
-                
-                new_data = pd.DataFrame([[kd, datetime.now().strftime("%Y-%m-%d"), pmsok, asl, jml, mdl, jml]], columns=df_in.columns)
-                updated_df = pd.concat([df_in, new_data], ignore_index=True)
-                conn.update(worksheet="stok_masuk", data=updated_df)
-                st.success(f"Data Berhasil Disimpan! Kode Produk: {kd}")
-                st.rerun()
+                if pmsok and asl:
+                    try:
+                        # 1. Logika Penamaan AJ80
+                        kd = f"{pmsok[0].upper()}{asl[0].upper()}{int(mdl/1000)}"
+                        tgl = datetime.now().strftime("%Y-%m-%d")
+                        
+                        # 2. Buat data baru dengan urutan kolom yang PASTI sama dengan GSheets
+                        # Pastikan urutan ini: kode, tanggal, pemasok, asal, qty, modal, sisa
+                        data_baru = pd.DataFrame([[kd, tgl, pmsok, asl, jml, mdl, jml]], 
+                                                 columns=['kode', 'tanggal', 'pemasok', 'asal', 'qty', 'modal', 'sisa'])
+                        
+                        # 3. Gabungkan dengan data lama
+                        df_updated = pd.concat([df_in, data_baru], ignore_index=True)
+                        
+                        # 4. Update ke Cloud
+                        conn.update(worksheet="stok_masuk", data=df_updated)
+                        
+                        st.success(f"✅ Berhasil Disimpan! Kode: {kd}")
+                        st.balloons()
+                        # Beri jeda sedikit agar user bisa lihat suksesnya sebelum refresh
+                    except Exception as e:
+                        st.error(f"Gagal menyimpan: {e}")
+                else:
+                    st.warning("Mohon isi Nama Pemasok dan Asal!")
 
     # --- FITUR: KASIR (ADMIN ONLY) ---
     elif "Kasir" in choice:
@@ -107,5 +123,6 @@ else:
         st.sidebar.error("Akses Ditolak: Password Salah!")
     st.title("🐝 AgroHoney Management Cloud")
     st.markdown("---")
-    st.write("Sistem ini terhubung langsung ke Google Sheets perusahaan. Silakan login untuk melihat dashboard atau menginput data.")
+    st.write("Sistem ini terhubung langsung ke Dokumen Pencatatan. Silakan login untuk melihat dashboard atau menginput data.")
     st.image("https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=800", caption="Digitalisasi Agrowisata California")
+
