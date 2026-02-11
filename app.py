@@ -108,26 +108,59 @@ if (role == "Owner" and key == "owner123") or (role == "Admin Penginput" and key
                 st.success("Harga Berhasil Diperbarui!")
                 st.rerun()
 
-    # --- MENU: KOREKSI DATA (HAPUS/UPDATE) ---
+    # --- MENU: KOREKSI DATA (VERSI ANTI-CRASH) ---
     elif "Koreksi Data" in menu:
-        st.header("🛠️ Koreksi Data (Delete)")
-        tab1, tab2 = st.tabs(["Hapus Batch Stok", "Hapus Transaksi Penjualan"])
+        st.header("🛠️ Pusat Koreksi Data")
+        
+        tab1, tab2 = st.tabs(["📦 Hapus Batch Stok", "💸 Hapus Transaksi Penjualan"])
+        
         with tab1:
-            kode_hapus = st.selectbox("Pilih Kode Batch yang akan Dihapus", [""] + df_in['kode'].tolist())
-            if st.button("Hapus Batch Stok"):
-                df_in = df_in[df_in['kode'] != kode_hapus]
-                conn.update(worksheet="stok_masuk", data=df_in)
-                st.success("Batch Terhapus!")
-                st.rerun()
+            st.subheader("Hapus Batch Stok Masuk")
+            if not df_in.empty:
+                # Pastikan list kode tidak kosong
+                list_kode = df_in['kode'].unique().tolist()
+                kode_hapus = st.selectbox("Pilih Kode Batch untuk Dihapus", ["-- Pilih Kode --"] + list_kode)
+                
+                if st.button("Konfirmasi Hapus Batch"):
+                    if kode_hapus != "-- Pilih Kode --":
+                        try:
+                            # Filter data: simpan yang TIDAK sama dengan kode_hapus
+                            df_updated_in = df_in[df_in['kode'] != kode_hapus]
+                            conn.update(worksheet="stok_masuk", data=df_updated_in)
+                            st.success(f"✅ Batch {kode_hapus} berhasil dihapus dari Cloud!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Gagal hapus: {e}")
+                    else:
+                        st.warning("Pilih kode terlebih dahulu!")
+            else:
+                st.info("Data stok masih kosong.")
+
         with tab2:
-            id_hapus = st.number_input("Masukkan ID Penjualan", min_value=0)
-            if st.button("Hapus Transaksi"):
-                df_out = df_out[df_out['id'] != id_hapus]
-                conn.update(worksheet="penjualan", data=df_out)
-                st.success("Transaksi Terhapus!")
-                st.rerun()
+            st.subheader("Hapus Transaksi Penjualan")
+            if not df_out.empty:
+                # Menampilkan data agar user bisa melihat ID-nya
+                st.write("Daftar Transaksi Terakhir:")
+                st.dataframe(df_out.tail(5), use_container_width=True)
+                
+                id_hapus = st.number_input("Masukkan ID Penjualan yang akan dihapus", min_value=0, step=1)
+                
+                if st.button("Konfirmasi Hapus Transaksi"):
+                    if id_hapus in df_out['id'].values:
+                        try:
+                            df_updated_out = df_out[df_out['id'] != id_hapus]
+                            conn.update(worksheet="penjualan", data=df_updated_out)
+                            st.success(f"✅ Transaksi ID {id_hapus} berhasil dihapus!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Gagal hapus transaksi: {e}")
+                    else:
+                        st.error("ID tidak ditemukan!")
+            else:
+                st.info("Data penjualan masih kosong.")
 
 else:
     if role != "Pilih User": st.sidebar.error("Password Salah!")
     st.title("🐝 AgroHoney Management Cloud")
     st.info("Silakan login untuk mengakses fitur kontrol.")
+
